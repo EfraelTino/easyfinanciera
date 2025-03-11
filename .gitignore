@@ -1,0 +1,5 @@
+finanapp/node_modules
+finanapp/.env
+vendor
+.env
+
