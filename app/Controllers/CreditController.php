@@ -28,11 +28,14 @@ class CreditController
     }
     public function getInterestRate()
     {
+        /*
         $search = $this->creditModel->calculatePaymentAmount();
         if (!$search) {
             return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'No se encontraron datos']);
         }
         return $this->utils->jsonResponse(200, ['success' => true, 'message' => $search]);
+         */
+
     }
     public function createCredit($request)
     {
@@ -53,8 +56,11 @@ class CreditController
             return $this->utils->jsonResponse(200, ['success' => true, 'message' => 'Ocupación creada correctamente' . $createdOccupationId]);
             // enviar false la ocupation 
             $insertUser = $this->createUserCredit($data, $createdOccupationId, false);
+            //esto retorna el id $insertUser['id']
         }
         $insertUser = $this->createUserCredit($data, $searchOccupation['id'], true);
+            //esto retorna el id $insertUser['id']
+
         if (!$insertUser) {
             return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Error al crear el usuario']);
         }
@@ -63,6 +69,7 @@ class CreditController
          * FIRST - CREATE CREDIT AND RETURN CLIENT ID TABLE credit_user
          * SECOND - INSERT ADDRESS OF CLIENT TYPE ARRAY table address_credit_user
          * THIRD - INSERT DATA OF LOANS WITH CLIENT ID table loans
+         * PENDING - VERIFY IF A USER EXIST AND RETURN USER DATA, IF YOU HAVE CREDIT PENDING OR MORA
          */
 
         /**
@@ -80,18 +87,21 @@ class CreditController
     {
 
         $insertuser = $this->creditModel->createUserCredit($datas['userdata'], $ocupationid, $statusOcupation);
-
-        if (!$insertuser) {
+        if(!$insertuser){
             return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Error al crear el usuario']);
         }
 
         foreach ($datas['address'] as $address) {
-            $insertAddress = $this->creditModel->createAddress($address, $insertuser);
+            $insertAddress = $this->creditModel->createAddress($address, $insertuser['id']);
             if (!$insertAddress) {
                 return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Error al crear la dirección'. $insertAddress]);
             }
         }
-        $insertLoan = $this->creditModel->createLoan($datas['loans'], $insertuser);
-        return $this->utils->jsonResponse(200, ['success' => true, 'message' => 'Direcciones creadas correctamente']);
+
+    $insertLoan = $this->creditModel->createLoan($datas['userdata'], $insertuser['id']);
+    if(!$insertLoan['status']){
+        return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Error al crear el prestamo']);
+    }
+        return $this->utils->jsonResponse(200, ['success' => true, 'message' => $insertLoan['message']]);  
     }
 }

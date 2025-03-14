@@ -32,30 +32,49 @@ class CreditModel
     }
     public function createUserCredit($data, $ocupationid, $statusOcupation)
     {
-        $statusOcupation = $statusOcupation == true ? $data['occupation_id'] : $ocupationid;
+        try {
+            $statusOcupation = $statusOcupation == true ? $data['occupation_id'] : $ocupationid;
 
-        $query = "INSERT INTO credit_user (dni, name, lastname, birthday, civil_state, occupation_id, phone, document, gender, persontype, asesor_id) VALUES (:userdni, :username, :userlastname, :userbirthday, :usercivil_state, :useroccupation_id, :userphone, :userdocument, :gender, :persontype, :asesor_id)";
+            $query = "INSERT INTO credit_user (dni, name, lastname, birthday, civil_state, occupation_id, phone, document, gender, persontype, asesor_id, credit_portfolio_id) VALUES (:userdni, :username, :userlastname, :userbirthday, :usercivil_state, :useroccupation_id, :userphone, :userdocument, :gender, :persontype, :asesor_id, :credit_portfolio_id)";
 
-        $stmt = $this->db->prepare($query);
-        $stmt->bindParam(':userdni', $data['dni']);
-        $stmt->bindParam(':username', $data['name']);
-        $stmt->bindParam(':userlastname', $data['lastname']);
-        $stmt->bindParam(':userbirthday', $data['birthday']);
-        $stmt->bindParam(':usercivil_state', $data['civil_state']);
-        $stmt->bindParam(':useroccupation_id', $statusOcupation);
-        $stmt->bindParam(':userphone', $data['phone']);
-        $stmt->bindParam(':userdocument', $data['document']);
-        $stmt->bindParam(':gender', $data['gender']);
-        $stmt->bindParam(':persontype', $data['persontype']);
-        $stmt->bindParam(':asesor_id', $data['asesor_id']);
-        $stmt->execute();
-        return $this->db->lastInsertId();
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(':userdni', $data['dni']);
+            $stmt->bindParam(':username', $data['name']);
+            $stmt->bindParam(':userlastname', $data['lastname']);
+            $stmt->bindParam(':userbirthday', $data['birthday']);
+            $stmt->bindParam(':usercivil_state', $data['civil_state']);
+            $stmt->bindParam(':useroccupation_id', $statusOcupation);
+            $stmt->bindParam(':userphone', $data['phone']);
+            $stmt->bindParam(':userdocument', $data['document']);
+            $stmt->bindParam(':gender', $data['gender']);
+            $stmt->bindParam(':persontype', $data['persontype']);
+            $stmt->bindParam(':asesor_id', $data['asesor_id']);
+            $stmt->bindParam(':credit_portfolio_id', $data['credit_portfolio']);
+            $stmt->execute();
+            if (!$stmt) {
+                return [
+                    'status' => false,
+                    'message' => 'Error al crear el usuario'
+                ];
+            }
+            return [
+                'status' => true,
+                'message' => 'Usuario creado correctamente',
+                'id' => $this->db->lastInsertId()
+            ];
+        } catch (\Throwable $th) {
+            return [
+                'status' => false,
+                'message' => 'Error al crear el usuario',
+                'error' => $th->getMessage()
+            ];
+        }
     }
     public function createAddress($data, $id)
     {
         $latitude = (!empty($data['latitud']) && is_numeric($data['latitud'])) ? (float)$data['latitud'] : 0.0;
 
-        $query = "INSERT INTO address_credit_user (user_id, condicion, tipo, principal, depatamento_id, provincia_id, distrito_id, direccion, denominacion, latitud) VALUES (:user_id, :condicion, :tipo, :principal, :departament_id, :provincia_id, :distrito_id, :direccion, :denominacion, :latitud)";
+        $query = "INSERT INTO address_credit_user (user_id, condicion, tipo, principal, depatamento_id, provincia_id, distrito_id, direccion, denominacion ,latitud) VALUES (:user_id, :condicion, :tipo, :principal, :departament_id, :provincia_id, :distrito_id, :direccion, :denominacion, :latitud)";
         $stmt = $this->db->prepare($query);
 
         $stmt->bindParam(':user_id', $id);
@@ -67,7 +86,7 @@ class CreditModel
         $stmt->bindParam(':distrito_id', $data['distrito_id']);
         $stmt->bindParam(':direccion', $data['direccion']);
         $stmt->bindParam(':denominacion', $data['denominacion']);
-        $stmt->bindParam(':latitud', $latitude, PDO::PARAM_NULL); // Especificar que puede ser NULL
+        $stmt->bindParam(':latitud', $latitude, PDO::PARAM_NULL); // Especificar que puede ser NULl
         $stmt->execute();
         return $this->db->lastInsertId();
     }
@@ -106,14 +125,14 @@ class CreditModel
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
     //calcular interés total --- creo que hay un error
-    public function calculateTotalInterest($amount = 500, $interestRate = 0.08, $days = 90)
+    public function calculateTotalInterest($amount, $interestRate, $days)
     {
         $dailyInterest = ($amount * $interestRate) / 30; // Interés diario basado en 30 días
         $totalInterest = $dailyInterest * $days;
         return $totalInterest;
     }
     //calculo total a pago 
-    public function calculateTotalPayable($amount = 500, $totalInterest = 40)
+    public function calculateTotalPayable($amount, $totalInterest)
     {
         $totalPayable = $amount + $totalInterest;
         return $totalPayable;
@@ -150,7 +169,7 @@ class CreditModel
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     public function insertPrestamo($data) {}
-    public function calculatePaymentAmount($diasPago= 30, $tipoPago= 1, $montoTotal= 540)
+    public function calculatePaymentAmount($data)
     {
         // Valores de ejemplo para pruebas
 
@@ -168,17 +187,23 @@ class CreditModel
          * payment_interest_rate: tasa de interés
          * payment_admin_fee: comisión administrativa
          * 
+         *  $data['tipoPago'] = 1;
+         $data['totalDays'] = 30;
+         $data['amount'] = 540;
+         DATA ----- NO SE QUE ESTOY HACIENDO ACÁ PERO FUNCIONA ASI QUE NO LO VUELVO A TOCAR : P
          */
+
+        
         $data = [
-            'idperiodopagos' => $tipoPago, // Pago semanal
-            'montoTotaldePago' => $montoTotal, // Monto de 580
-            'term' => $diasPago, // 30 días
+            'idperiodopagos' => $data['tipoPago'], // Pago semanal
+            'montoTotaldePago' => $data['amount'], // Monto de 580
+            'term' => $data['totalDays'] // 30 días
         ];
         $activeDays = $this->getDayOfWeek();
-        $amount = isset($data['montoTotaldePago']) ? $data['montoTotaldePago'] : 500; // Monto por defecto 500
-        $term = isset($data['term']) ? $data['term'] : 30; // Plazo por defecto 30 días
+        $amount =$data['montoTotaldePago']; // Monto por defecto 500
+        $term = $data['term']; // Plazo por defecto 30 días
 
-        $tipoPago = $this->getTypePayment(isset($data['idperiodopagos']) ? $data['idperiodopagos'] : 1); // Tipo pago por defecto diario
+        $tipoPago = $data['idperiodopagos']; // Tipo pago por defecto diario
 
         // Obtener la fecha actual y sumar un día para empezar mañana
         $todayStr = $this->getToday();
@@ -204,7 +229,7 @@ class CreditModel
             $activeDaysMap[$dayNumber] = $day['status'] == 1;
         }
 
-        switch ($tipoPago['id']) {
+        switch ($tipoPago) {
             case 1: // Diario
                 $currentDate = clone $startDate;
                 $daysCount = 0;
@@ -272,7 +297,7 @@ class CreditModel
 
             // Crear el calendario de pagos con montos
             $paymentSchedule[] = [
-                'date' => $formattedDate,
+                'date' => DateTime::createFromFormat('d-m-Y', $formattedDate)->format('Y-m-d'),
                 'montodePago' => floatval($regularPaymentAmount)
             ];
         }
@@ -282,7 +307,7 @@ class CreditModel
             'start_date' => $startDate->format('d-m-Y'),
             'end_date' => $endDate->format('d-m-Y'),
             'simulation_amount' => $amount,
-            'payment_type' => $tipoPago['id'],
+            'payment_type' => $tipoPago,
             'total_amount_verification' => number_format(array_sum($paymentAmounts), 2, '.', ''),
             'payment_amount' => floatval($regularPaymentAmount),
             'last_payment_amount' => floatval($lastPaymentAmount),
@@ -291,7 +316,62 @@ class CreditModel
             'payment_schedule' => $paymentSchedule
         ];
     }
+    //insertamos el calendario de pagos
+    public function createPaymentSchedule($payments, $creditId, $clientId)
+    {
+        try {
+            $query = "INSERT INTO payment_schedule (credit_client_id, scheduled_date, scheduled_amount, paid_amount, status, client_id, id_prestamo) 
+                      VALUES (:credit_client_id, :scheduled_date, :scheduled_amount, :paid_amount, :status, :client_id, :id_prestamo)";
 
+            $stmt = $this->db->prepare($query);
+
+            foreach ($payments as $payment) {
+                $stmt->bindParam(':credit_client_id', $creditId);
+                $stmt->bindParam(':scheduled_date', $payment['date']);
+                $stmt->bindParam(':scheduled_amount', $payment['montodePago']);
+                $stmt->bindParam(':paid_amount', $payment['montodePago']);
+                $stmt->bindValue(':status', 'pendiente'); // Estado inicial del pago
+                $stmt->bindParam(':client_id', $clientId);
+                $stmt->bindParam(':id_prestamo', $creditId);
+                $stmt->execute();
+            }
+
+            return ['status' => true, 'message' => 'Calendario de pagos creado correctamente', 'id' => $this->db->lastInsertId()];
+        } catch (\Throwable $th) {
+            return ['status' => false, 'message' => 'Error al crear el calendario de pagos', 'error' => $th->getMessage()];
+        }
+    }
+
+    //insertamos el prestamo
+    public function createPaymentRegister($data)
+    {
+        try {
+            $query = "INSERT INTO payments_register_credit_client (client_credit_user, date_prestamo, payment_start_date, payment_end_date, total_amount, id_type_payment, total_amount_verification, current_payment_amount, last_payment_amount, total_payments, idEstadoPrestamo, tasaInteres, tramite_dministrativo, central_riesgo, totalDaysPago) VALUES (:userid, :date_prestamo, :payment_start_date, :payment_end_date, :total_amount, :id_type_payment, :total_amount_verification, :current_payment_amount, :last_payment_amount, :total_payments, :idEstadoPrestamo, :tasaInteres, :tramite_dministrativo, :central_riesgo, :totalDaysPago)";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(':userid', $data['client_credit_user']);
+            $stmt->bindParam(':date_prestamo', $data['dia_prestamo']);
+            $stmt->bindParam(':payment_start_date', $data['fecha_inicio_pago']);
+            $stmt->bindParam(':payment_end_date', $data['fecha_fin_pago']);
+            $stmt->bindParam(':total_amount', $data['monto_prestado']);
+            $stmt->bindParam(':id_type_payment', $data['tipo_pago']);
+            $stmt->bindParam(':total_amount_verification', $data['monto_prestado']);
+            $stmt->bindParam(':current_payment_amount', $data['monto_pago_actual']);
+            $stmt->bindParam(':last_payment_amount', $data['monto_pago_ultimo']);
+            $stmt->bindParam(':total_payments', $data['total_pagos']);
+            $stmt->bindParam(':idEstadoPrestamo', $data['idEstadoPrestamo']);
+            $stmt->bindParam(':tasaInteres', $data['tasaInteres']);
+            $stmt->bindParam(':tramite_dministrativo', $data['tramite_dministrativo']);
+            $stmt->bindParam(':central_riesgo', $data['central_riesgo']);
+            $stmt->bindParam(':totalDaysPago', $data['totalDaysPago']);
+            $stmt->execute();
+            if (!$stmt) {
+                return ['status' => false, 'message' => 'Error al crear el prestamo'];
+            }
+            return ['status' => true, 'message' => 'Prestamo creado correctamente', 'id' => $this->db->lastInsertId()];
+        } catch (\Throwable $th) {
+            return ['status' => false, 'message' => 'Error al crear el prestamo', 'error' => $th->getMessage()];
+        }
+    }
     public function createLoan($data, $id)
     {
         $diasPago = $data['totalDays'];
@@ -301,22 +381,58 @@ class CreditModel
         $tasaInteres = $this->getInterestRate()['interestRate'];
         $tasaAdministrativa = $this->getInterestRate()['adminFee'];
         $tasaRiesgo = $this->getInterestRate()['riskFee'];
+
+        $soloInteres = $this->calculateTotalInterest($montoPrestado, $tasaInteres, $diasPago);
+
+        $totalPago = $this->calculateTotalPayable($montoPrestado, $soloInteres);
+
+        $data['amount'] = $totalPago;
+        $data['monto_prestado'] = $totalPago;
         
-        $tramiteAdministrativo = $montoPrestado * $tasaAdministrativa;
+       $pretamoARelizar = $this->calculatePaymentAmount($data);
 
-        $montoTotal = $this->calculateTotalInterest($montoPrestado, $tasaInteres);
+        //insertamos el prestamo
 
-        $totalPago = $this->calculateTotalPayable($montoPrestado, $tasaInteres);
-
-        $centralRiesgo = $tasaRiesgo == 0 ? $this->calculateRiskFee($montoPrestado, $tasaRiesgo) : $tasaRiesgo;
-
-        $interesGenerado = $this->calculateTotalInterest($montoPrestado, $tasaInteres);
-
-        $pretamoARelizar = $this->calculatePaymentAmount($diasPago, $tipoPago, $montoTotal);
-
-        $query = "INSERT INTO loans (client_id, amount, interest_rate, total_interest, admin_fee, risk_fee, total_payable, term, start_date, end_date, status, credit_portfolio) VALUES (:user_id, :loan_type, :loan_amount, :loan_term, :loan_interest_rate)";
-        $stmt = $this->db->prepare($query);
-        $stmt->bindParam(':user_id', $id);
-        $stmt->execute();
+        $params = [
+            'client_credit_user' => $id, //id del usuario que recibe prestamo --- joder que dificil es esto
+            'dia_prestamo' => DateTime::createFromFormat('d-m-Y', $pretamoARelizar['date'])->format('Y-m-d'),
+            'fecha_inicio_pago' => DateTime::createFromFormat('d-m-Y', $pretamoARelizar['start_date'])->format('Y-m-d'),
+            'fecha_fin_pago' => DateTime::createFromFormat('d-m-Y', $pretamoARelizar['end_date'])->format('Y-m-d'),
+            'monto_prestado' => $pretamoARelizar['simulation_amount'],
+        
+            'tipo_pago' => $pretamoARelizar['payment_type'],
+            'monto_total_verificacion' => $pretamoARelizar['simulation_amount'],
+        
+            'monto_pago_actual' => $pretamoARelizar['payment_amount'],
+        
+            'monto_pago_ultimo' => $pretamoARelizar['last_payment_amount'],
+            'total_pagos' => $pretamoARelizar['total_payments'],
+        
+            'idEstadoPrestamo' => $data['status'],
+            'tasaInteres' => $tasaInteres,
+            //considerar que esto debe de venir del controller
+            'tramite_dministrativo' => $tasaAdministrativa,
+            'central_riesgo' => $tasaRiesgo,
+            'totalDaysPago' => $diasPago,
+        
+        ];
+        $crearPrestamo = $this->createPaymentRegister($params, $id);
+      
+        //if (!$crearPrestamo) {
+        //    return ['status' => false, 'message' => 'Error al crear el prestamo'];
+        //}
+        //insertamos el calendario de pagos
+        /**
+         * 
+         */
+        if(!$crearPrestamo['status']){
+            return ['status' => false, 'message' => 'Error al crear el prestamo'];
+        }
+        $crearCalendario = $this->createPaymentSchedule($pretamoARelizar['payment_schedule'], $crearPrestamo['id'], $id);
+        if (!$crearCalendario) {
+            return ['status' => false, 'message' => 'Error al crear el calendario de pagos'];
+        }
+        
+        return ['status' => true, 'message' => 'Prestamo creado correctamente'];
     }
 }
