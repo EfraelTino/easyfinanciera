@@ -78,7 +78,10 @@ class Utils
         date_default_timezone_set('America/Bogota');
         return date('Y-m-d H:i:s');
     }
-
+    public function dateFetch (){
+        date_default_timezone_set('America/Bogota');
+        return date('d-m-Y');
+    }
     public function sendEmail($email)
     {
         $mail = new PHPMailer(true);

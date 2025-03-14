@@ -26,17 +26,17 @@ class CreditController
         }
         return $this->utils->jsonResponse(200, ['success' => true, 'message' => $search]);
     }
+    public function getInterestRate()
+    {
+        $search = $this->creditModel->calculatePaymentAmount();
+        if (!$search) {
+            return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'No se encontraron datos']);
+        }
+        return $this->utils->jsonResponse(200, ['success' => true, 'message' => $search]);
+    }
     public function createCredit($request)
     {
         $data = $request['body'];
-        $validateFields = $this->utils->validateAllFields($data["userdata"]);
-        $validateAdress = $this->utils->validateArrays($data["address"]);
-        if (!$validateFields['status']) {
-            return $this->utils->jsonResponse(200, ['success' => false, 'message' => $validateFields['message'] . json_encode($data)]);
-        }
-        if (!$validateAdress['status']) {
-            return $this->utils->jsonResponse(200, ['success' => false, 'message' => $validateAdress['message']]);
-        }
         $userById = $this->userModel->findUserIdActive($data['userdata']['asesor_id']);
         if (!$userById) {
             return  $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Asesor no encontrado']);
@@ -46,14 +46,19 @@ class CreditController
             if (!$data['userdata']['occupationname']) {
                 return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Ingresa la ocupación']);
             }
-            $createdOccupationId = $this->creditModel->createOccupation($data['occupationname']);
+            $createdOccupationId = $this->creditModel->createOccupation($data['userdata']['occupationname']);
             if (!$createdOccupationId) {
                 return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Error al crear la ocupación' . $createdOccupationId]);
             }
             return $this->utils->jsonResponse(200, ['success' => true, 'message' => 'Ocupación creada correctamente' . $createdOccupationId]);
+            // enviar false la ocupation 
+            $insertUser = $this->createUserCredit($data, $createdOccupationId, false);
         }
-
-        return $this->utils->jsonResponse(200, ['success' => true, 'message' => 'Ocupación encontrada' . json_encode($validateAdress)]);
+        $insertUser = $this->createUserCredit($data, $searchOccupation['id'], true);
+        if (!$insertUser) {
+            return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Error al crear el usuario']);
+        }
+        return $this->utils->jsonResponse(200, ['success' => true, 'message' => $insertUser]);
         /**
          * FIRST - CREATE CREDIT AND RETURN CLIENT ID TABLE credit_user
          * SECOND - INSERT ADDRESS OF CLIENT TYPE ARRAY table address_credit_user
@@ -71,16 +76,22 @@ class CreditController
         return $this->utils->jsonResponse(200, ['success' => true, 'message' => $credit]);
          */
     }
-    public function createUserCredit($datas){
-        $insertUser = $this->creditModel->createUserCredit($datas['userdata']);
-        if(!$insertUser){
+    public function createUserCredit($datas, $ocupationid, $statusOcupation)
+    {
+
+        $insertuser = $this->creditModel->createUserCredit($datas['userdata'], $ocupationid, $statusOcupation);
+
+        if (!$insertuser) {
             return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Error al crear el usuario']);
         }
 
-        $insertAddress = $this->creditModel->createAddress($datas['address'], $insertUser['id']);
-        if(!$insertAddress){
-            return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Error al crear la dirección']);
+        foreach ($datas['address'] as $address) {
+            $insertAddress = $this->creditModel->createAddress($address, $insertuser);
+            if (!$insertAddress) {
+                return $this->utils->jsonResponse(200, ['success' => false, 'message' => 'Error al crear la dirección'. $insertAddress]);
+            }
         }
-        return $this->utils->jsonResponse(200, ['success' => true, 'message' => 'Dirección creada correctamente']);
+        $insertLoan = $this->creditModel->createLoan($datas['loans'], $insertuser);
+        return $this->utils->jsonResponse(200, ['success' => true, 'message' => 'Direcciones creadas correctamente']);
     }
 }

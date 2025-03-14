@@ -51,6 +51,9 @@ $router->post('/create-credit', function () use ($creditController) {
 $router->get('/dateCredits', function () use ($creditController) {
     echo $creditController->manageDateCredits();
 });
+$router->get('/interest-rate', function () use ($creditController) {
+    echo $creditController->getInterestRate();
+});
 
 
 
